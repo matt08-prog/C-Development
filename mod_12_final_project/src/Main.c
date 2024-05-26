@@ -26,20 +26,31 @@ void print_usage(char *argv[]) {
 int main(int argc, char *argv[]) {
 
 	char *file_path = NULL;
+	char *add_string = NULL;
 	bool new_file = false;
+	bool should_list_employees = false;
 	int c = 0;
 
 	int database_fd = -1;
+	struct dbheader_t *dbhdr = NULL;
+	struct employee_t *employees = NULL;
 
 	// n is a boolean flag
-	// f is a file path argument (:)
-	while((c=getopt(argc, argv, "nf:")) != -1) {
+	// a is a String argument (:)
+	// f is a String argument (:)
+	while((c=getopt(argc, argv, "na:f:l")) != -1) {
 		switch(c) {
 			case 'n':
 				new_file = true;
 				break;
 			case 'f':
 				file_path = optarg;
+				break;
+			case 'a':
+				add_string = optarg;
+				break;
+			case 'l':
+				should_list_employees = true;
 				break;
 			case '?':
 				printf("Unkown argument -%c\n", c);
@@ -66,16 +77,46 @@ int main(int argc, char *argv[]) {
 			printf("Could not create database file\n");
 			return -1;
 		}
+
+		if(create_db_header(database_fd, &dbhdr) == STATUS_ERROR) {
+			printf("Failed to create database file\n");
+			return -1;
+		}
 	} else {
 		database_fd = open_databse_file(file_path);
 		if (database_fd == STATUS_ERROR) {
 			printf("Could not open database file\n");
 			return -1;
 		}
+
+
+
+		if (validate_db_header(database_fd, &dbhdr) == STATUS_ERROR) {
+			printf("Failed to vaildate database file\n");
+			return -1;
+		}
 	}
 
+	if (read_employees(database_fd, dbhdr, &employees) != STATUS_SUCCESS) {
+		printf("Failed to read employees\n");
+		return 0;
+	}
 
+	if (add_string) {
+		dbhdr->count++;
+		employees = realloc(employees, dbhdr->count*(sizeof(struct employee_t)));
 
+		if(add_employee(dbhdr, employees, add_string) != STATUS_SUCCESS) {
+			printf("Faild to add employee: %s\n", add_string);
+			return 0;
+		}
+	}
+
+	if (should_list_employees) {
+		list_employees(dbhdr, employees);
+	}
+
+	output_file(database_fd, dbhdr, employees);
 	// int fd, num_employees;
 
 	// // if (argc != 2) {
