@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include "common.h"
 #include "Parse.h"
@@ -41,6 +42,48 @@ int add_employee(struct dbheader_t *dbhdr, struct employee_t *employees, char *a
 	
 
 	return STATUS_SUCCESS;
+}
+
+int remove_employee_from_file(int fd,struct dbheader_t *dbhdr, int previous_num_employees){
+	// clear file since it shrunk after losing an employee
+	ftruncate(fd, 0);
+
+	return STATUS_SUCCESS;
+}
+
+
+int remove_employee(struct dbheader_t *dbhdr, struct employee_t *employees, char *removestring) {
+	printf("%s\n", removestring);
+	bool found_employee = false;
+	// char *name = strtok(addstring, ",");
+
+	// char *addr = strtok(NULL, ",");
+
+	// char *hours = strtok(NULL, ",");
+
+	// printf("%s %s %s\n", name, addr, hours);
+	
+	// strncpy(employees[dbhdr->count-1].name, name, sizeof(employees[dbhdr->count-1].name));
+	// strncpy(employees[dbhdr->count-1].address, addr, sizeof(employees[dbhdr->count-1].address));
+
+	// employees[dbhdr->count-1].hours = atoi(hours);
+	
+	for (int i = 0; i < dbhdr->count; i++)
+	{
+		printf("%s\n", employees[i].name);
+		if(strcmp(employees[i].name, removestring) == 0) {
+			found_employee = true;
+			continue;
+		}
+
+		if (found_employee) {
+			employees[i - 1] = employees [i];
+		}
+	}
+
+	// employees[dbhdr->count - 1] = {};
+
+	return found_employee ? STATUS_SUCCESS : STATUS_ERROR;
 }
 
 int read_employees(int fd, struct dbheader_t *dbhdr, struct employee_t **employeesOut) {
@@ -83,7 +126,7 @@ int output_file(int fd, struct dbheader_t *dbhdr, struct employee_t *employees) 
 	dbhdr->filesize = htonl(sizeof(struct dbheader_t) + (sizeof(struct employee_t) * realcount));
 	dbhdr->count = htons(dbhdr->count);
 	dbhdr->version = htons(dbhdr->version);
-
+	printf("%d\n", realcount);
 	lseek(fd, 0, SEEK_SET);
 
 	write(fd, dbhdr, sizeof(struct dbheader_t));
@@ -91,6 +134,7 @@ int output_file(int fd, struct dbheader_t *dbhdr, struct employee_t *employees) 
 	int i = 0;
 	for (; i < realcount; i++) {
 		employees[i].hours = htonl(employees[i].hours);
+		printf("Writing Employee %d to database file\n", i);
 		write(fd, &employees[i], sizeof(struct employee_t));
 	}
 
@@ -137,7 +181,7 @@ int validate_db_header(int fd, struct dbheader_t **headerOut) {
 	struct stat dbstat = {0};
 	fstat(fd, &dbstat);
 	if (header->filesize != dbstat.st_size) {
-		printf("Corrupted database\n");
+		printf("Corrupted database; expected %d, got %ld\n", header->filesize, dbstat.st_size);
 		free(header);
 		return -1;
 	}
